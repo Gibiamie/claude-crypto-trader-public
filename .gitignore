@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+
+# Çalışma durumu — herkes kendi denemesiyle üretir, repoya girmez
+state/
+journal/*.jsonl
+tick.log
+
+# Next
+web/node_modules/
+web/.next/
+web/out/
+
+# Env
+.env
+web/.env
+web/.env.local
