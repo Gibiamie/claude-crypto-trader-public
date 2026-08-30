@@ -14,13 +14,15 @@ import urllib.request
 from config import MODEL_TIMEOUT, NVIDIA_BASE_URL
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.S)
+_THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
 
 
 def extract_json(text: str) -> dict:
-    """Modelin çıktısından JSON'u çıkar. Fence ve önsöz toleranslı."""
+    """Modelin çıktısından JSON'u çıkar. Fence, düşünme bloğu ve önsöz toleranslı."""
     text = (text or "").strip()
     if not text:
         raise ValueError("boş yanıt")
+    text = _THINK.sub("", text).strip()  # olası "düşünme" bloğunu at
     m = _FENCE.search(text)
     if m:
         text = m.group(1).strip()
@@ -82,6 +84,7 @@ def call_nvidia(prompt: str, model: str) -> dict:
         "temperature": 0.4,
         "max_tokens": 1024,
         "stream": False,
+        "chat_template_kwargs": {"enable_thinking": False},
     }).encode("utf-8")
 
     req = urllib.request.Request(
