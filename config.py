@@ -24,18 +24,25 @@ TAKER_FEE = 0.0007        # %0.07 — Hyperliquid spot taker
 SLIPPAGE = 0.0005         # %0.05 — ince order book payı
 MIN_TRADE_USD = 25.0      # altındaki emirler ücret gürültüsü, reddedilir
 
-# Üç agent da AYNI model + AYNI effort + AYNI veri alır. Tek değişken risk profili.
+# NVIDIA NIM (build.nvidia.com) — OpenAI-uyumlu, ücretsiz katman.
+# Kart istemiyor, dakikada ~40 istek sınırı var (biz saatte 3 istek yapıyoruz).
+# Model değiştirmek istersen: https://build.nvidia.com katalogundan başka bir
+# `org/model-adı` seç ve burada değiştir — tek yer, her şeyi etkiler.
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+NVIDIA_MODEL = "meta/llama-3.3-70b-instruct"
+MODEL_TIMEOUT = 180
+
+# Üç agent da AYNI model + AYNI veriyi alır. Tek değişken risk profili.
 # Leaderboard bu yüzden model kıyası değil strateji kıyasıdır: "risk iştahı sonucu
 # ne kadar değiştiriyor?"
 #
 # `id`   → kalıcı anahtar (journal dosyası). DEĞİŞTİRME, veriyi bozar.
 # `name` → sitede gösterilen isim. Serbestçe değiştirilebilir.
-# `effort` None ise --effort bayrağı hiç gönderilmez.
 AGENTS = [
     {
         "id": "temkinli", "name": "Demir", "label": "Demir",
         "tagline": "Az yatırır, çok bekler. Para kaybetmekten korkar.",
-        "model": "opus", "effort": "max",
+        "model": NVIDIA_MODEL, "effort": None,
         "persona": (
             "SEN DEMİR'SİN. Temkinli bir yatırımcısın.\n"
             "- Paranın çoğunu nakitte tutarsın. Az yatırım yaparsın.\n"
@@ -48,7 +55,7 @@ AGENTS = [
     {
         "id": "dengeli", "name": "Terazi", "label": "Terazi",
         "tagline": "Yarısını yatırır, yarısını bekletir. Ortada durur.",
-        "model": "opus", "effort": "max",
+        "model": NVIDIA_MODEL, "effort": None,
         "persona": (
             "SEN TERAZİ'SİN. Dengeli bir yatırımcısın.\n"
             "- Paranın bir kısmını yatırır, bir kısmını nakitte tutarsın.\n"
@@ -61,7 +68,7 @@ AGENTS = [
     {
         "id": "risksever", "name": "Alev", "label": "Alev",
         "tagline": "Neredeyse hepsini yatırır. Beklemeyi kayıp sayar.",
-        "model": "opus", "effort": "max",
+        "model": NVIDIA_MODEL, "effort": None,
         "persona": (
             "SEN ALEV'SİN. Cesur bir yatırımcısın.\n"
             "- Paranın neredeyse tamamını yatırırsın. Nakit sana kayıp gibi gelir.\n"
@@ -71,13 +78,4 @@ AGENTS = [
             "- Yine de bir nedenin olmadan alım yapmazsın."
         ),
     },
-]
-
-CLAUDE_TIMEOUT = 600
-
-# Claude Code'u cron'da tool'suz çalıştır — 7/24 gözetimsiz bir agent'a
-# Bash/Write vermek gereksiz risk. Görev zaten JSON-al JSON-ver.
-CLAUDE_DISALLOWED_TOOLS = [
-    "Bash", "Edit", "Write", "NotebookEdit", "Read", "Glob", "Grep",
-    "WebFetch", "WebSearch", "Task", "TodoWrite",
 ]
