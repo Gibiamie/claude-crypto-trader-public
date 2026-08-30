@@ -29,7 +29,7 @@ MIN_TRADE_USD = 25.0      # altındaki emirler ücret gürültüsü, reddedilir
 # Model değiştirmek istersen: https://build.nvidia.com katalogundan başka bir
 # `org/model-adı` seç ve burada değiştir — tek yer, her şeyi etkiler.
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-NVIDIA_MODEL = "meta/llama-3.3-70b-instruct"
+NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 MODEL_TIMEOUT = 180
 
 # Üç agent da AYNI model + AYNI veriyi alır. Tek değişken risk profili.
