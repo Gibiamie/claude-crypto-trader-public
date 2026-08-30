@@ -1,15 +1,17 @@
-"""Claude Code (headless) çağrısı.
+"""NVIDIA NIM (OpenAI-uyumlu) API çağrısı — build.nvidia.com üzerinden ücretsiz.
 
-Döndürdüğü sözleşme:
+Döndürdüğü sözleşme (tick.py'nin beklediği, orijinal agents.py ile aynı):
     {"ok": bool, "decisions": [...], "thesis": str, "raw": str,
      "usage": {...}, "error": str|None}
 """
 
 import json
+import os
 import re
-import subprocess
+import urllib.error
+import urllib.request
 
-from config import CLAUDE_DISALLOWED_TOOLS, CLAUDE_TIMEOUT
+from config import MODEL_TIMEOUT, NVIDIA_BASE_URL
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.S)
 
@@ -69,44 +71,55 @@ def _fail(err: str, raw: str = "") -> dict:
             "usage": {}, "error": err}
 
 
-def call_claude_code(prompt: str, model: str, effort: str | None) -> dict:
-    cmd = ["claude", "-p", prompt, "--model", model]
-    # Effort desteklemeyen modeller için bayrağı hiç gönderme.
-    if effort:
-        cmd += ["--effort", effort]
-    cmd += [
-        "--output-format", "json",
-        "--disallowedTools", *CLAUDE_DISALLOWED_TOOLS,
-    ]
+def call_nvidia(prompt: str, model: str) -> dict:
+    api_key = os.environ.get("NVIDIA_API_KEY")
+    if not api_key:
+        return _fail("NVIDIA_API_KEY tanımlı değil")
+
+    body = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.4,
+        "max_tokens": 1024,
+        "stream": False,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        f"{NVIDIA_BASE_URL}/chat/completions",
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=CLAUDE_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return _fail(f"timeout ({CLAUDE_TIMEOUT}s)")
+        with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
+            env = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "ignore")[:300]
+        return _fail(f"HTTP {e.code}: {detail}")
+    except urllib.error.URLError as e:
+        return _fail(f"network: {e.reason}")
+    except TimeoutError:
+        return _fail(f"timeout ({MODEL_TIMEOUT}s)")
 
-    if proc.returncode != 0:
-        return _fail(f"exit {proc.returncode}: {(proc.stderr or proc.stdout)[:300]}")
+    choices = env.get("choices") or []
+    if not choices:
+        return _fail("boş choices", json.dumps(env)[:300])
 
-    try:
-        env = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return _fail("claude JSON zarfı okunamadı", proc.stdout[:300])
-
-    # Limit/throttle burada görünür — gap olarak kaydedilmesi kritik.
-    if env.get("is_error") or env.get("subtype") != "success":
-        return _fail(f"claude: {env.get('subtype')} / {env.get('api_error_status')}",
-                     str(env.get("result", ""))[:300])
-
-    raw = env.get("result", "")
+    raw = choices[0].get("message", {}).get("content", "")
     u = env.get("usage", {}) or {}
     usage = {
-        "cost_usd": env.get("total_cost_usd"),
-        "input": u.get("input_tokens"),
-        "output": u.get("output_tokens"),
-        "cache_create": u.get("cache_creation_input_tokens"),
-        "cache_read": u.get("cache_read_input_tokens"),
-        "duration_ms": env.get("duration_ms"),
-        "served_model": list((env.get("modelUsage") or {}).keys()),
+        "cost_usd": 0.0,  # NVIDIA ücretsiz katman — gerçek maliyet yok
+        "input": u.get("prompt_tokens"),
+        "output": u.get("completion_tokens"),
+        "cache_create": None,
+        "cache_read": None,
+        "duration_ms": None,
+        "served_model": [model],
     }
     try:
         return _normalize(extract_json(raw), raw, usage)
@@ -115,4 +128,4 @@ def call_claude_code(prompt: str, model: str, effort: str | None) -> dict:
 
 
 def call(agent: dict, prompt: str) -> dict:
-    return call_claude_code(prompt, agent["model"], agent.get("effort"))
+    return call_nvidia(prompt, agent["model"])
