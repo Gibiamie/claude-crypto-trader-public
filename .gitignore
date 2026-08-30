@@ -4,7 +4,7 @@ __pycache__/
 
 # Çalışma durumu — herkes kendi denemesiyle üretir, repoya girmez
 state/
-journal/*.jsonl
+#journal/*.jsonl
 tick.log
 
 # Next
