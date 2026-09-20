@@ -34,7 +34,7 @@ export default async function StockMarketPage({ params }) {
           </p>
         </div>
         <div className="empty">
-          GitHub Actions&apos;ta ilgili workflow&apos;u manuel çalıştırınca ilk veri burada görünecek.
+          İlk geçerli piyasa seansı tick&apos;i tamamlandığında veri burada görünecek.
         </div>
       </>
     );
@@ -128,7 +128,7 @@ export default async function StockMarketPage({ params }) {
                 <td className="num">{pct(c.change_20_pct)}</td>
                 <td className="num">{pct(c.rel_20_pct)}</td>
                 <td className="num">{c.rsi14}</td>
-                <td className="num">{c.volume_ratio}</td>
+                <td className="num">{c.volume_ratio == null ? "—" : c.volume_ratio}</td>
                 <td className="num">{c.score}</td>
               </tr>
             ))}
