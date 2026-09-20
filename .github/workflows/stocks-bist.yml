@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: stocks-bist
+  group: repo-data-writer
   cancel-in-progress: false
 
 jobs:
