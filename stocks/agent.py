@@ -68,6 +68,10 @@ def validate_payload(
     if not isinstance(parsed, dict):
         raise ValueError("üst seviye JSON object değil")
 
+    extra_top = set(parsed) - {"orders"}
+    if extra_top:
+        raise ValueError("üst seviyede yalnız orders alanı olabilir")
+
     orders = parsed.get("orders")
     if not isinstance(orders, list):
         raise ValueError("orders liste değil")
@@ -81,6 +85,10 @@ def validate_payload(
     for order in orders:
         if not isinstance(order, dict):
             raise ValueError("emir object değil")
+
+        extra_order = set(order) - {"symbol", "action", "notional", "confidence", "signals"}
+        if extra_order:
+            raise ValueError("emirde izin verilmeyen alan")
 
         symbol = str(order.get("symbol", "")).upper().strip()
         action = str(order.get("action", "")).upper().strip()
