@@ -10,7 +10,7 @@ No real money, wallet, private key or KYC is used.
 
 ## Active experiment
 
-`v2-2026-09-20`
+`v2.1-2026-09-20`
 
 Phase 0 / V1 rows are intentionally kept in `journal/*.jsonl` for audit history, but the dashboard excludes them from V2 performance calculations.
 
@@ -29,7 +29,7 @@ GitHub Actions (hourly)
   │    ├─ 0.07% taker fee
   │    └─ 0.05% slippage
   ├─ journal/<agent>.jsonl
-  └─ state/v2-2026-09-20/*.json  ← persisted back to GitHub
+  └─ state/v2.1-2026-09-20/*.json  ← persisted back to GitHub
 
 Vercel / Next.js
   └─ reads active experiment rows and renders the dashboard
@@ -41,7 +41,7 @@ The original GitHub Actions workflow persisted only `journal/*.jsonl`, while the
 
 Because GitHub-hosted runners are ephemeral, every run effectively started from a fresh $10,000 portfolio and recreated the HODL benchmark.
 
-V2 fixes this by persisting both journal and state, while also storing a full `portfolio_state` snapshot in every V2 journal row as a recovery path.
+V2 fixes this by persisting both journal and state, while also storing a full `portfolio_state` snapshot in every journal row as a recovery path. The first live V2 validation exposed a first-entry repair edge case; V2.1 starts clean and enforces at least one BUY until an agent has established its first position.
 
 ## Execution rules
 

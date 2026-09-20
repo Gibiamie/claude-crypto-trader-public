@@ -158,9 +158,10 @@ def run_agent(agent: dict, market: dict, prices: dict, hodl: float, hodl_state: 
     pf.save(agent_id)
     n = tick_number(agent_id)
 
-    prompt_tick = 0 if pf.trades == 0 and not pf.positions else n
+    first_entry = pf.trades == 0 and not pf.positions
+    prompt_tick = 0 if first_entry else n
     prompt = build(pf, market, prices, read_history(agent_id), prompt_tick, persona=agent.get("persona", ""))
-    res = call(agent, prompt)
+    res = call(agent, prompt, require_buy=first_entry)
 
     row = {
         **meta(ts, agent, n),
