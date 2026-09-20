@@ -61,7 +61,8 @@ KESİN KURALLAR
 8. signals yalnız şu alanlardan seçilebilir:
    last, sma20, rsi14, change_5_pct, change_20_pct, rel_20_pct,
    volume_ratio, volatility_20_pct, score
-9. reason, thesis, yorum, haber veya serbest metin üretme.
+9. Değeri null olan bir signal seçme.
+10. reason, thesis, yorum, haber veya serbest metin üretme.
    Sistem gerekçeyi seçtiğin signals alanlarının GERÇEK snapshot değerlerinden oluşturacak.
 
 GİRDİ
