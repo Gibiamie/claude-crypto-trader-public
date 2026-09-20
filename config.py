@@ -6,20 +6,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 JOURNAL_DIR = ROOT / "journal"
 
-# V1/Phase 0 satırları journal dosyalarında korunur ancak aktif deneyden ayrılır.
-# Yeni bir metodoloji/model değişikliğinde yeni bir EXPERIMENT_ID kullan.
-EXPERIMENT_ID = os.environ.get("EXPERIMENT_ID", "v2-2026-09-20")
+# Her metodoloji değişikliğinde yeni EXPERIMENT_ID kullan.
+# v2-2026-09-20 ilk canlı doğrulama koşusuydu; first-entry repair guard
+# sonrasında temiz karşılaştırma v2.1 ile başlar.
+EXPERIMENT_ID = os.environ.get("EXPERIMENT_ID", "v2.1-2026-09-20")
 SCHEMA_VERSION = 2
-STRATEGY_VERSION = "v2.0.0"
+STRATEGY_VERSION = "v2.1.0"
 
-# GitHub Actions runner geçicidir; bu klasör workflow sonunda repoya commit edilir.
 STATE_DIR = ROOT / "state" / EXPERIMENT_ID
 
-# Hyperliquid spot pair `name` değerleri.
 ASSETS = {
-    "BTC": "@142",   # UBTC/USDC
-    "ETH": "@151",   # UETH/USDC
-    "HYPE": "@107",  # HYPE/USDC
+    "BTC": "@142",
+    "ETH": "@151",
+    "HYPE": "@107",
 }
 
 START_CASH = 10_000.0
@@ -31,7 +30,6 @@ TAKER_FEE = 0.0007
 SLIPPAGE = 0.0005
 MIN_TRADE_USD = 25.0
 
-# NVIDIA NIM — OpenAI uyumlu.
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 MODEL_TIMEOUT = 180
@@ -39,8 +37,6 @@ MODEL_TEMPERATURE = 0.0
 MODEL_MAX_TOKENS = 1024
 MODEL_REPAIR_ATTEMPTS = 1
 
-# Üç agent aynı model + aynı veri + aynı inference ayarlarını alır.
-# Kontrollü değişken yalnız risk personasıdır.
 AGENTS = [
     {
         "id": "temkinli", "name": "Stop", "label": "Stop",
