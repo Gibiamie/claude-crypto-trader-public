@@ -58,7 +58,7 @@ def extract_json(text: str) -> dict:
     raise ValueError(f"JSON kapanmadı: {text[:200]}")
 
 
-def validate_payload(parsed: dict) -> dict:
+def validate_payload(parsed: dict, require_buy: bool = False) -> dict:
     if not isinstance(parsed, dict):
         raise ValueError("üst seviye JSON object değil")
     decisions = parsed.get("decisions")
@@ -69,11 +69,14 @@ def validate_payload(parsed: dict) -> dict:
 
     normalized = []
     seen = set()
+    buy_count = 0
+
     for d in decisions:
         if not isinstance(d, dict):
             raise ValueError("karar object değil")
         coin = str(d.get("coin", "")).upper().strip()
         action = str(d.get("action", "")).upper().strip()
+
         if coin not in ASSETS:
             raise ValueError(f"bilinmeyen coin: {coin}")
         if coin in seen:
@@ -87,30 +90,41 @@ def validate_payload(parsed: dict) -> dict:
             confidence = float(d.get("confidence"))
         except (TypeError, ValueError):
             raise ValueError(f"{coin}: usd/confidence sayı değil")
+
         if not math.isfinite(usd) or usd < 0:
             raise ValueError(f"{coin}: usd geçersiz")
         if action in ("BUY", "SELL") and usd <= 0:
             raise ValueError(f"{coin}: {action} için usd > 0 olmalı")
         if action == "HOLD":
             usd = 0.0
+        if action == "BUY":
+            buy_count += 1
+
         if not math.isfinite(confidence) or not 0 <= confidence <= 1:
             raise ValueError(f"{coin}: confidence 0-1 dışında")
+
+        reason = str(d.get("reason", "")).strip()
+        if not reason:
+            raise ValueError(f"{coin}: reason boş")
 
         normalized.append({
             "coin": coin,
             "action": action,
             "usd": round(usd, 6),
             "confidence": confidence,
-            "reason": str(d.get("reason", ""))[:300],
+            "reason": reason[:300],
         })
 
     if seen != set(ASSETS):
         raise ValueError("her varlık için tam bir karar gerekli")
+    if require_buy and buy_count == 0:
+        raise ValueError("ilk giriş turunda en az bir BUY gerekli")
 
-    return {
-        "decisions": normalized,
-        "thesis": str(parsed.get("thesis", ""))[:600],
-    }
+    thesis = str(parsed.get("thesis", "")).strip()
+    if not thesis:
+        raise ValueError("thesis boş")
+
+    return {"decisions": normalized, "thesis": thesis[:600]}
 
 
 def _fail(err: str, raw: str = "", usage: dict | None = None) -> dict:
@@ -132,8 +146,9 @@ def _merge_usage(total: dict, add: dict) -> dict:
     out["cache_create"] = None
     out["cache_read"] = None
     out["duration_ms"] = None
-    models = list(dict.fromkeys((out.get("served_model") or []) + (add.get("served_model") or [])))
-    out["served_model"] = models
+    out["served_model"] = list(dict.fromkeys(
+        (out.get("served_model") or []) + (add.get("served_model") or [])
+    ))
     return out
 
 
@@ -191,7 +206,7 @@ def _one_call(prompt: str, model: str) -> tuple[str, dict] | dict:
     return raw, usage
 
 
-def call_nvidia(prompt: str, model: str) -> dict:
+def call_nvidia(prompt: str, model: str, require_buy: bool = False) -> dict:
     attempt_prompt = prompt
     total_usage = {}
     last_raw = ""
@@ -207,7 +222,7 @@ def call_nvidia(prompt: str, model: str) -> dict:
         total_usage = _merge_usage(total_usage, usage)
 
         try:
-            parsed = validate_payload(extract_json(raw))
+            parsed = validate_payload(extract_json(raw), require_buy=require_buy)
             return {
                 "ok": True,
                 "decisions": parsed["decisions"],
@@ -221,16 +236,24 @@ def call_nvidia(prompt: str, model: str) -> dict:
             last_error = str(e)
             if attempt >= MODEL_REPAIR_ATTEMPTS:
                 break
+
+            first_entry_rule = (
+                " BU İLK GİRİŞ TURU: en az bir karar BUY olmalı; "
+                "elde coin yokken SELL verme."
+                if require_buy else ""
+            )
             attempt_prompt = (
                 "Aşağıdaki yanıt geçersiz. Yalnızca geçerli JSON döndür. "
                 "BTC, ETH ve HYPE için tam birer karar olmalı; coin tekrarı olmasın. "
                 "action yalnız BUY, SELL veya HOLD; confidence 0 ile 1 arasında. "
-                "BUY/SELL için usd > 0, HOLD için usd 0 olsun. Açıklama/markdown yazma.\n\n"
+                "BUY/SELL için usd > 0, HOLD için usd 0 olsun. "
+                "Her kararın reason alanı ve üst seviye thesis alanı boş olmasın."
+                f"{first_entry_rule} Açıklama/markdown yazma.\n\n"
                 f"GEÇERSİZ YANIT:\n{raw[:5000]}"
             )
 
     return _fail(f"JSON/schema parse: {last_error}", last_raw[:1000], total_usage)
 
 
-def call(agent: dict, prompt: str) -> dict:
-    return call_nvidia(prompt, agent["model"])
+def call(agent: dict, prompt: str, require_buy: bool = False) -> dict:
+    return call_nvidia(prompt, agent["model"], require_buy=require_buy)
