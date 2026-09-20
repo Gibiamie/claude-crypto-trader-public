@@ -1,0 +1,12 @@
+{
+  "cash": 75005.67064,
+  "positions": {
+    "YKBNK.IS": 689.0
+  },
+  "cost_basis": {
+    "YKBNK.IS": 24994.32936
+  },
+  "realized_pnl": 0.0,
+  "friction_paid": 24.96936,
+  "trades": 1
+}
