@@ -1,7 +1,7 @@
 import { readdir, readFile } from "fs/promises";
 import path from "path";
 
-export const ACTIVE_EXPERIMENT_ID = process.env.EXPERIMENT_ID || "v2-2026-09-20";
+export const ACTIVE_EXPERIMENT_ID = process.env.EXPERIMENT_ID || "v2.1-2026-09-20";
 
 const JOURNAL_DIR = process.env.JOURNAL_DIR
   ? path.resolve(process.env.JOURNAL_DIR)
