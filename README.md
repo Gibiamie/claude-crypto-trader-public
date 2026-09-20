@@ -154,8 +154,8 @@ US and BIST use separate experiment IDs, state directories, journals, starting c
 
 | Market | Experiment | Start cash | Benchmark |
 |---|---|---:|---|
-| US | `us-v1-2026-09-20` | $10,000 | SPY |
-| BIST | `bist-v1-2026-09-20` | ₺100,000 | BIST 100 |
+| US | `us-v1.1-2026-09-21` | $10,000 | SPY |
+| BIST | `bist-v1.1-2026-09-21` | ₺100,000 | BIST 100 |
 
 Starting cash is an experiment parameter and can be changed in `stocks/config.py` before a new experiment begins.
 
@@ -201,3 +201,21 @@ GitHub Actions workflows:
 - `BIST Stocks Tick`
 
 Manual workflow runs bypass the session-hours guard, but the duplicate-bar guard remains active.
+
+
+### V1.1 methodology guardrails
+
+The first US/BIST manual integration run on 2026-09-20 is retained as test history but excluded from the active V1.1 dashboards.
+
+V1.1 adds three controls before the first official market-session tick:
+
+- out-of-session manual workflows no longer create paper fills
+- the benchmark bar must belong to the current local trading date; stale Friday/holiday data is rejected
+- the model returns only symbol/action/notional/confidence/signal names; user-facing reasons are generated deterministically from the exact snapshot values
+
+This prevents free-text claims such as unsupported SMA50, 52-week-high or valuation references from entering the experimental rationale.
+
+The active stock experiments are:
+
+- `us-v1.1-2026-09-21`
+- `bist-v1.1-2026-09-21`
