@@ -182,6 +182,52 @@ def run_agent(market, agent, snapshot: dict, benchmark_state: dict, ts: str) -> 
     portfolio = load_portfolio(market, agent_id)
     prices = snapshot["prices"]
     tick = tick_number(market, agent_id)
+
+    missing_held = sorted(set(portfolio.positions) - set(prices))
+    if missing_held:
+        row = {
+            "ts": ts,
+            "tick": tick,
+            "market": market.id,
+            "market_name": market.name,
+            "currency": market.currency,
+            "start_cash": market.start_cash,
+            "experiment_id": market.experiment_id,
+            "agent": agent_id,
+            "name": agent["name"],
+            "risk_profile": {
+                "min_cash_pct": agent["min_cash_pct"],
+                "max_position_pct": agent["max_position_pct"],
+                "max_orders": agent["max_orders"],
+            },
+            "model": NVIDIA_MODEL,
+            "temperature": 0.0,
+            "git_sha": os.environ.get("GITHUB_SHA"),
+            "data_source": snapshot["source"],
+            "market_bar_ts": snapshot["benchmark"]["bar_ts"],
+            "market_snapshot": snapshot,
+            "benchmark_state": benchmark_state,
+            "benchmark_value": round(
+                benchmark_value(benchmark_state, float(snapshot["benchmark"]["price"])), 2
+            ),
+            "benchmark_name": market.benchmark_name,
+            "orders": [],
+            "thesis": "",
+            "usage": {},
+            "repaired": False,
+            "ok": False,
+            "error": "held position price missing: " + ", ".join(missing_held),
+            "gap": True,
+            "fills": [],
+            "equity": None,
+            "cash": round(portfolio.cash, 2),
+            "positions": portfolio.positions,
+            "trades": portfolio.trades,
+            "friction_paid": round(portfolio.friction_paid, 2),
+            "portfolio_state": portfolio.snapshot(),
+        }
+        write_journal(market, agent_id, row)
+        return row
     allowed = {c["symbol"] for c in snapshot["candidates"]} | set(portfolio.positions)
     held = set(portfolio.positions)
     require_buy = portfolio.trades == 0 and not portfolio.positions
@@ -215,6 +261,7 @@ def run_agent(market, agent, snapshot: dict, benchmark_state: dict, ts: str) -> 
         "temperature": 0.0,
         "git_sha": os.environ.get("GITHUB_SHA"),
         "data_source": snapshot["source"],
+        "market_bar_ts": snapshot["benchmark"]["bar_ts"],
         "market_snapshot": snapshot,
         "benchmark_state": benchmark_state,
         "benchmark_value": round(benchmark_value(benchmark_state, benchmark_px), 2),
@@ -264,6 +311,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--market", required=True, choices=sorted(MARKETS))
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--allow-duplicate", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -279,6 +327,12 @@ def main() -> int:
     except Exception as e:
         print(f"[{market.id}] MARKET DATA HATA: {e}")
         return 1
+
+    bar_ts = snapshot["benchmark"]["bar_ts"]
+    previous = experiment_rows(market, AGENTS[0]["id"])
+    if previous and previous[-1].get("market_bar_ts") == bar_ts and not args.allow_duplicate:
+        print(f"[{market.id}] aynı market barı zaten işlendi ({bar_ts}); tick atlandı")
+        return 0
 
     benchmark_state = init_benchmark(market, snapshot)
     print(
