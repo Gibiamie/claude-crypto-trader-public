@@ -1,12 +1,6 @@
 /**
  * Zaman içinde portföy değeri — her karakter bir çizgi, HODL kesikli çizgi.
- * Alım (yeşil ▲) ve satım (kırmızı ▼) yapılan saatler çizginin üstünde işaretli.
- *
- * Donut gibi: sunucu bileşeni, saf SVG. Grafik kütüphanesi yok.
- *
- * ponytail: saatlik veri çoğaldıkça alım/satım üçgenleri sıklaşabilir; şimdilik
- * bilgi taşıyor (kim çok işlem yapıyor görülüyor). Kalabalık olursa günlük
- * gruplama eklenir.
+ * gap:true kayıtları çizgide gerçekten kesinti oluşturur.
  */
 
 export const AGENT_COLORS = {
@@ -31,20 +25,30 @@ const money = (n) => "$" + Math.round(n).toLocaleString("tr-TR");
 const shortDate = (t) =>
   new Date(t).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
 
+function splitOnGaps(points) {
+  const out = [];
+  let current = [];
+  for (const p of points) {
+    if (p.gap) {
+      if (current.length) out.push(current);
+      current = [];
+      continue;
+    }
+    current.push(p);
+  }
+  if (current.length) out.push(current);
+  return out;
+}
+
 export default function EquityChart({ data }) {
   const series = data?.series || [];
   const hodl = data?.hodl || [];
-
   const allPts = series.flatMap((s) => s.points);
+
   if (allPts.length + hodl.length < 2) {
-    return (
-      <div className="empty">
-        Grafik için yeterli veri yok — en az birkaç saat gerekiyor.
-      </div>
-    );
+    return <div className="empty">Grafik için yeterli veri yok — en az birkaç saat gerekiyor.</div>;
   }
 
-  // --- ölçek ---
   const ts = [...allPts.map((p) => p.t), ...hodl.map((h) => h.t)];
   const vs = [10000, ...allPts.map((p) => p.equity), ...hodl.map((h) => h.value)];
   let tMin = Math.min(...ts);
@@ -62,7 +66,8 @@ export default function EquityChart({ data }) {
   const yTicks = [0, 1, 2, 3].map((i) => yMin + ((yMax - yMin) * i) / 3);
   const xTicks = [0, 1, 2, 3].map((i) => tMin + ((tMax - tMin) * i) / 3);
 
-  const line = (pts) => pts.map((p) => `${x(p.t).toFixed(1)},${y(p.equity ?? p.value).toFixed(1)}`).join(" ");
+  const line = (pts) =>
+    pts.map((p) => `${x(p.t).toFixed(1)},${y(p.equity ?? p.value).toFixed(1)}`).join(" ");
   const triUp = (cx, cy) => `M${cx},${cy - 3.2} L${cx - 3},${cy + 2.2} L${cx + 3},${cy + 2.2}Z`;
   const triDown = (cx, cy) => `M${cx},${cy + 3.2} L${cx - 3},${cy - 2.2} L${cx + 3},${cy - 2.2}Z`;
 
@@ -70,7 +75,6 @@ export default function EquityChart({ data }) {
     <div className="equity-wrap">
       <svg viewBox={`0 0 ${W} ${H}`} className="equity-chart" role="img"
            aria-label="Zaman içinde portföy değeri">
-        {/* yatay ızgara + $ etiketleri */}
         {yTicks.map((v, i) => (
           <g key={i}>
             <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
@@ -80,15 +84,11 @@ export default function EquityChart({ data }) {
           </g>
         ))}
 
-        {/* başlangıç $10.000 referans çizgisi */}
         {10000 >= yMin && 10000 <= yMax && (
-          <g>
-            <line x1={PAD.l} x2={W - PAD.r} y1={y(10000)} y2={y(10000)}
-                  stroke={AXIS} strokeWidth="1" strokeDasharray="2 4" opacity="0.5" />
-          </g>
+          <line x1={PAD.l} x2={W - PAD.r} y1={y(10000)} y2={y(10000)}
+                stroke={AXIS} strokeWidth="1" strokeDasharray="2 4" opacity="0.5" />
         )}
 
-        {/* tarih etiketleri */}
         {xTicks.map((t, i) => (
           <text key={i} x={x(t)} y={H - 12} fill={AXIS} fontSize="11"
                 textAnchor={i === 0 ? "start" : i === 3 ? "end" : "middle"}>
@@ -96,24 +96,27 @@ export default function EquityChart({ data }) {
           </text>
         ))}
 
-        {/* HODL — kesikli */}
         {hodl.length > 1 && (
           <polyline points={line(hodl)} fill="none" stroke={AXIS} strokeWidth="1.6"
                     strokeDasharray="5 4" opacity="0.8" />
         )}
 
-        {/* her karakter */}
         {series.map((s, i) => {
           const c = colorFor(s.agent, i);
+          const segments = splitOnGaps(s.points);
           return (
             <g key={s.agent}>
-              <polyline points={line(s.points)} fill="none" stroke={c}
-                        strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+              {segments.map((seg, j) => (
+                seg.length > 1
+                  ? <polyline key={`seg-${j}`} points={line(seg)} fill="none" stroke={c}
+                              strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                  : <circle key={`pt-${j}`} cx={x(seg[0].t)} cy={y(seg[0].equity)} r="1.8" fill={c} />
+              ))}
               {s.points.map((p, j) =>
-                p.buy ? <path key={`b${j}`} d={triUp(x(p.t), y(p.equity))} fill={UP} /> : null,
+                !p.gap && p.buy ? <path key={`b${j}`} d={triUp(x(p.t), y(p.equity))} fill={UP} /> : null,
               )}
               {s.points.map((p, j) =>
-                p.sell ? <path key={`s${j}`} d={triDown(x(p.t), y(p.equity))} fill={DOWN} /> : null,
+                !p.gap && p.sell ? <path key={`s${j}`} d={triDown(x(p.t), y(p.equity))} fill={DOWN} /> : null,
               )}
             </g>
           );
@@ -127,16 +130,9 @@ export default function EquityChart({ data }) {
             {s.name}
           </li>
         ))}
-        <li>
-          <span className="dot dash" />
-          Alıp bekleyen (HODL)
-        </li>
-        <li>
-          <span className="tri up">▲</span> alım
-        </li>
-        <li>
-          <span className="tri down">▼</span> satım
-        </li>
+        <li><span className="dot dash" /> BTC/ETH/HYPE eşit ağırlıklı HODL</li>
+        <li><span className="tri up">▲</span> alım</li>
+        <li><span className="tri down">▼</span> satım</li>
       </ul>
     </div>
   );
