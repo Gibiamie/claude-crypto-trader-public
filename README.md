@@ -118,3 +118,86 @@ It returns only the active experiment.
 `.github/workflows/tick.yml` runs at minute 17 of each hour. GitHub Actions schedules can still be delayed; the dashboard reports run coverage and gaps.
 
 This is an experiment, not financial advice.
+
+
+---
+
+## Multi-market stock experiments
+
+The same repository now contains two additional **paper-only** market experiments:
+
+- **US Stocks** — `/stocks/us`
+- **BIST** — `/stocks/bist`
+
+They do not send orders to Midas or any other live brokerage account.
+
+### Stock engine
+
+```text
+starter universe
+    ↓
+deterministic technical screener
+    ↓
+top 8 candidates
+    ↓
+Stop / Endeks / Boğa
+    ↓
+risk-budgeted paper execution
+    ↓
+stock_journal/<market>/*.jsonl
+stock_state/<market>/<experiment>/*.json
+    ↓
+web dashboard
+```
+
+US and BIST use separate experiment IDs, state directories, journals, starting cash and benchmarks.
+
+| Market | Experiment | Start cash | Benchmark |
+|---|---|---:|---|
+| US | `us-v1-2026-09-20` | $10,000 | SPY |
+| BIST | `bist-v1-2026-09-20` | ₺100,000 | BIST 100 |
+
+Starting cash is an experiment parameter and can be changed in `stocks/config.py` before a new experiment begins.
+
+### Data source
+
+V1 uses the Yahoo Finance chart endpoint as a **zero-key prototype adapter**. It is intentionally isolated behind `stocks/provider_yahoo.py`.
+
+It is **not** treated as an official/licensed Borsa İstanbul feed. Before using BIST results for serious intraday evaluation, replace the adapter with a licensed Borsa İstanbul data vendor. For US equities, the provider can later be replaced with Alpaca Market Data or another production feed without changing the portfolio/AI engine.
+
+### Trading assumptions
+
+- no short selling
+- no leverage
+- US fractional shares supported in the simulator
+- BIST uses whole-share quantities
+- 0.10% broker-neutral simulated friction per side
+- Stop keeps at least 70% cash and max 12% per position
+- Endeks keeps at least 35% cash and max 22% per position
+- Boğa keeps at least 5% cash and max 40% per position
+- SELLs execute before BUYs
+- BUY requests are scaled to cash floor and position caps
+- repeated runs on the same market bar are skipped
+
+The 0.10% friction is an experimental assumption, **not a statement of Midas's current fee schedule**.
+
+### Manual test
+
+```bash
+python3 -m unittest discover -s tests -v
+
+# Fetch market data and inspect prompts without model calls:
+python3 -m stocks.tick --market us --force --dry-run
+python3 -m stocks.tick --market bist --force --dry-run
+
+# Full paper ticks require NVIDIA_API_KEY:
+python3 -m stocks.tick --market us --force
+python3 -m stocks.tick --market bist --force
+```
+
+GitHub Actions workflows:
+
+- `US Stocks Tick`
+- `BIST Stocks Tick`
+
+Manual workflow runs bypass the session-hours guard, but the duplicate-bar guard remains active.
