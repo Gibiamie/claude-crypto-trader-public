@@ -1,13 +1,13 @@
-import { standings } from "@/lib/journal";
+import { experimentStatus, standings } from "@/lib/journal";
 
 export const dynamic = "force-dynamic";
 
-/** Public okuma endpoint'i — auth yok, kasten. Veri zaten herkese açık. */
 export async function GET() {
-  const rows = await standings();
+  const [rows, status] = await Promise.all([standings(), experimentStatus()]);
   return Response.json(
     {
       updated_at: new Date().toISOString(),
+      experiment: status,
       agents: rows.map((r) => ({
         agent: r._id,
         label: r.label,
@@ -20,6 +20,7 @@ export async function GET() {
         trades: r.trades ?? 0,
         fees_paid: r.fees_paid ?? 0,
         gaps: r.gaps ?? 0,
+        repaired: r.repaired ?? 0,
       })),
     },
     { headers: { "Cache-Control": "public, max-age=30" } },
