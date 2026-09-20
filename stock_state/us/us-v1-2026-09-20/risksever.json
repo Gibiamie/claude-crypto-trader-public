@@ -1,0 +1,12 @@
+{
+  "cash": 6000.05000596,
+  "positions": {
+    "MU": 3.9338
+  },
+  "cost_basis": {
+    "MU": 3999.9499940399996
+  },
+  "realized_pnl": 0.0,
+  "friction_paid": 3.99595404,
+  "trades": 1
+}
