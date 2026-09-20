@@ -2,8 +2,8 @@ import { readdir, readFile } from "fs/promises";
 import path from "path";
 
 const ACTIVE = {
-  us: "us-v1-2026-09-20",
-  bist: "bist-v1-2026-09-20",
+  us: "us-v1.1-2026-09-21",
+  bist: "bist-v1.1-2026-09-21",
 };
 
 const FALLBACK = {

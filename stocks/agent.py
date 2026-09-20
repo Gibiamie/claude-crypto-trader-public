@@ -68,6 +68,10 @@ def validate_payload(
     if not isinstance(parsed, dict):
         raise ValueError("üst seviye JSON object değil")
 
+    extra_top = set(parsed) - {"orders"}
+    if extra_top:
+        raise ValueError("üst seviyede yalnız orders alanı olabilir")
+
     orders = parsed.get("orders")
     if not isinstance(orders, list):
         raise ValueError("orders liste değil")
@@ -81,6 +85,10 @@ def validate_payload(
     for order in orders:
         if not isinstance(order, dict):
             raise ValueError("emir object değil")
+
+        extra_order = set(order) - {"symbol", "action", "notional", "confidence", "signals"}
+        if extra_order:
+            raise ValueError("emirde izin verilmeyen alan")
 
         symbol = str(order.get("symbol", "")).upper().strip()
         action = str(order.get("action", "")).upper().strip()
@@ -108,14 +116,14 @@ def validate_payload(
         if not isinstance(signals, list):
             raise ValueError(f"{symbol}: signals liste değil")
         signals = [str(x) for x in signals]
-        if any(sig not in ALLOWED_SIGNALS for sig in signals):
-            raise ValueError(f"{symbol}: bilinmeyen signal")
         if not signals:
             raise ValueError(f"{symbol}: en az bir signal gerekli")
-
-        reason = str(order.get("reason", "")).strip()
-        if not reason:
-            raise ValueError(f"{symbol}: reason boş")
+        if len(signals) > 4:
+            raise ValueError(f"{symbol}: en fazla 4 signal")
+        if any(sig not in ALLOWED_SIGNALS for sig in signals):
+            raise ValueError(f"{symbol}: bilinmeyen signal")
+        if len(set(signals)) != len(signals):
+            raise ValueError(f"{symbol}: tekrarlanan signal")
 
         seen.add(symbol)
         buys += int(action == "BUY")
@@ -125,24 +133,18 @@ def validate_payload(
             "notional": round(notional, 6),
             "confidence": confidence,
             "signals": signals,
-            "reason": reason[:300],
         })
 
     if require_buy and buys == 0:
         raise ValueError("ilk giriş turunda en az bir BUY gerekli")
 
-    thesis = str(parsed.get("thesis", "")).strip()
-    if not thesis:
-        raise ValueError("thesis boş")
-
-    return {"orders": normalized, "thesis": thesis[:700]}
+    return {"orders": normalized}
 
 
 def _fail(error: str, raw: str = "", usage: dict | None = None) -> dict:
     return {
         "ok": False,
         "orders": [],
-        "thesis": "",
         "raw": raw,
         "usage": usage or {},
         "error": error,
@@ -234,7 +236,6 @@ def call(
             return {
                 "ok": True,
                 "orders": parsed["orders"],
-                "thesis": parsed["thesis"],
                 "raw": raw,
                 "usage": total_usage,
                 "error": None,
@@ -244,6 +245,7 @@ def call(
             last_error = str(e)
             if attempt >= MODEL_REPAIR_ATTEMPTS:
                 break
+
             first = " En az bir BUY zorunlu." if require_buy else ""
             held = ", ".join(sorted(held_symbols)) or "YOK"
             allowed = ", ".join(sorted(allowed_symbols))
@@ -252,7 +254,8 @@ def call(
                 f"İzinli semboller: {allowed}. Elde olanlar: {held}. "
                 f"En fazla {max_orders} emir. action yalnız BUY/SELL. "
                 "Elde olmayan hisse için SELL verme. notional > 0, confidence 0-1. "
-                "signals yalnız izinli teknik alan adlarından oluşsun; reason ve thesis boş olmasın."
+                "signals yalnız izinli teknik alan adlarından oluşsun; en fazla 4 signal kullan. "
+                "Serbest metin reason veya thesis üretme."
                 f"{first}\n\nGEÇERSİZ CEVAP:\n{raw[:5000]}"
             )
 

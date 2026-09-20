@@ -1,4 +1,4 @@
-"""Stock agent prompt'u: yalnız verilen veriye dayalı karar."""
+"""Stock agent prompt'u: karar alanları modelden, gerekçe snapshot'tan."""
 
 import json
 
@@ -52,16 +52,18 @@ AMAÇ
 
 KESİN KURALLAR
 1. Dış bilgi, haber, bilanço, analist görüşü veya snapshot'ta olmayan gösterge KULLANMA.
-2. Özellikle SMA50, SMA200, MACD, haber, bilanço gibi veriler burada yoksa bunlardan söz etme.
-3. reason içinde yeni/uydurulmuş sayısal değer üretme. Verilen alan adlarına dayan.
-4. SELL yalnız mevcut pozisyonlar için olabilir. Açığa satış yok.
-5. BUY yalnız candidates veya mevcut pozisyon sembollerinden olabilir.
-6. Risk limitlerini ihlal edecek büyüklük isteme; execution motoru ayrıca limit uygular.
-7. BUY/SELL notional değeri {market.currency} cinsindendir.
-8. HOLD için emir yazma; işlem yoksa orders=[] kullan.
-9. signals yalnız şu alanlardan seçilebilir:
+2. SELL yalnız mevcut pozisyonlar için olabilir. Açığa satış yok.
+3. BUY yalnız candidates veya mevcut pozisyon sembollerinden olabilir.
+4. Risk limitlerini ihlal edecek büyüklük isteme; execution motoru ayrıca limit uygular.
+5. BUY/SELL notional değeri {market.currency} cinsindendir.
+6. HOLD için emir yazma; işlem yoksa orders=[] kullan.
+7. Her emir için yalnız kararında gerçekten kullandığın 1-4 signal alan adını seç.
+8. signals yalnız şu alanlardan seçilebilir:
    last, sma20, rsi14, change_5_pct, change_20_pct, rel_20_pct,
    volume_ratio, volatility_20_pct, score
+9. Değeri null olan bir signal seçme.
+10. reason, thesis, yorum, haber veya serbest metin üretme.
+   Sistem gerekçeyi seçtiğin signals alanlarının GERÇEK snapshot değerlerinden oluşturacak.
 
 GİRDİ
 {json.dumps(payload, ensure_ascii=False, indent=2)}
@@ -74,10 +76,8 @@ YALNIZ şu JSON şemasında cevap ver:
       "action": "BUY",
       "notional": 1000,
       "confidence": 0.70,
-      "signals": ["rel_20_pct", "score"],
-      "reason": "Kısa, yalnız verilen sinyallere dayalı gerekçe"
+      "signals": ["rel_20_pct", "score"]
     }}
-  ],
-  "thesis": "Bu tick için kısa portföy tezi"
+  ]
 }}
 """

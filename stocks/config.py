@@ -7,11 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 JOURNAL_ROOT = ROOT / "stock_journal"
 STATE_ROOT = ROOT / "stock_state"
 
+STOCK_SCHEMA_VERSION = 2
+STOCK_STRATEGY_VERSION = "v1.1.0"
+
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 MODEL_TIMEOUT = 180
 MODEL_TEMPERATURE = 0.0
-MODEL_MAX_TOKENS = 1400
+MODEL_MAX_TOKENS = 900
 MODEL_REPAIR_ATTEMPTS = 1
 
 DATA_SOURCE = "Yahoo Finance chart endpoint (prototype, unofficial)"
@@ -19,6 +22,7 @@ INTERVAL = "60m"
 RANGE = "10d"
 CANDIDATE_COUNT = 8
 MIN_VALID_SYMBOLS = 5
+
 
 @dataclass(frozen=True)
 class MarketConfig:
@@ -38,6 +42,7 @@ class MarketConfig:
     friction_rate: float
     universe: tuple[str, ...]
 
+
 MARKETS = {
     "us": MarketConfig(
         id="us",
@@ -46,7 +51,7 @@ MARKETS = {
         start_cash=10_000.0,
         benchmark_symbol="SPY",
         benchmark_name="SPY",
-        experiment_id="us-v1-2026-09-20",
+        experiment_id="us-v1.1-2026-09-21",
         timezone="America/New_York",
         open_hour=9,
         open_minute=30,
@@ -68,7 +73,7 @@ MARKETS = {
         start_cash=100_000.0,
         benchmark_symbol="XU100.IS",
         benchmark_name="BIST 100",
-        experiment_id="bist-v1-2026-09-20",
+        experiment_id="bist-v1.1-2026-09-21",
         timezone="Europe/Istanbul",
         open_hour=10,
         open_minute=0,
@@ -84,6 +89,7 @@ MARKETS = {
         ),
     ),
 }
+
 
 AGENTS = [
     {
@@ -120,6 +126,7 @@ AGENTS = [
         ),
     },
 ]
+
 
 ALLOWED_SIGNALS = {
     "last",
