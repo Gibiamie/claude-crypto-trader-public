@@ -1,7 +1,13 @@
 import Donut from "./donut";
 import EquityChart from "./equity-chart";
 import DailySlider from "./daily-slider";
-import { dailyResults, equityCurves, profiles, standings } from "@/lib/journal";
+import {
+  dailyResults,
+  equityCurves,
+  experimentStatus,
+  profiles,
+  standings,
+} from "@/lib/journal";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,7 +15,6 @@ export const revalidate = 0;
 const money = (n) =>
   n == null ? "—" : "$" + n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** İşaretli para: +$12,30 / −$4,50 — eksi değer "$-4.50" gibi görünmesin. */
 const signed = (n) =>
   n == null
     ? "—"
@@ -17,7 +22,6 @@ const signed = (n) =>
       "$" +
       Math.abs(n).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** "18B" gibi kısaltma yerine açık yaz — "B" milyar sanılabiliyor. */
 const tokens = (n) => {
   if (n == null) return "—";
   const tr = (x, d = 0) => x.toLocaleString("tr-TR", { maximumFractionDigits: d });
@@ -29,7 +33,6 @@ const tokens = (n) => {
 const pct = (n) => (n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
 const cls = (n) => (n == null ? "" : n > 0 ? "up" : n < 0 ? "down" : "");
 
-/** Bir agent'ın portföyünü halka grafiğe uygun dilimlere çevirir. */
 function slicesOf(row) {
   const out = [];
   const pos = row.positions || {};
@@ -43,17 +46,19 @@ function slicesOf(row) {
 }
 
 export default async function Home() {
-  const [rows, people, curves, daily] = await Promise.all([
+  const [rows, people, curves, daily, status] = await Promise.all([
     standings(),
     profiles(),
     equityCurves(),
     dailyResults(),
+    experimentStatus(),
   ]);
 
   if (!rows.length) {
     return (
       <div className="empty">
-        Henüz veri yok. İlk saat çalıştığında sonuçlar burada görünecek.
+        <strong>{status.experiment_id}</strong> henüz ilk geçerli tick&apos;ini üretmedi.
+        Eski Phase 0 kayıtları ({status.legacy_rows} satır) korunuyor ancak V2 sonuçlarına dahil edilmiyor.
       </div>
     );
   }
@@ -66,30 +71,36 @@ export default async function Home() {
       <div className="card intro">
         <p>
           Üç yapay zeka karakterine <strong>10.000 dolar sanal para</strong> verdik.
-          Her saat başı piyasaya bakıp <strong>kendi başlarına</strong> alım satım
-          kararı veriyorlar. Üçü de aynı yapay zekayı kullanıyor ve aynı verileri
-          görüyor. Tek fark: <strong>karakterleri.</strong> Biri korkak, biri
-          dengeli, biri cesur.
+          Saatlik çalıştırılan simülasyonda aynı piyasa verisini ve aynı modeli görüyorlar.
+          Tek kontrollü fark: <strong>risk karakterleri.</strong>
         </p>
         <p style={{ marginBottom: 0 }}>
-          Amaç şunu görmek: <strong>karakter, sonucu ne kadar değiştiriyor?</strong>
+          Aktif deney: <strong>{status.experiment_id}</strong>. Phase 0 verileri arşiv amaçlı korunur,
+          bu leaderboard&apos;a karışmaz.
+        </p>
+      </div>
+
+      <div className="card">
+        <h3>Deney sağlığı</h3>
+        <p style={{ marginBottom: 0 }}>
+          Çalışma sayısı: <strong>{status.runs}</strong>
+          {" · "}Planlanan saate göre kapsama: <strong>{status.coverage_pct == null ? "—" : `${status.coverage_pct.toFixed(1)}%`}</strong>
+          {" · "}Cevap/veri boşluğu: <strong>{status.gaps}</strong>
+          {" · "}JSON repair: <strong>{status.repaired}</strong>
         </p>
       </div>
 
       <h2>Zaman içinde kim önde?</h2>
       <p className="section-note">
-        Her karakterin parası saat saat nasıl değişti. Kesikli çizgi:{" "}
-        <strong>hiç dokunmadan bekleyen</strong> (HODL). Üçgenler o saat{" "}
-        <strong>alım</strong> (yeşil) ya da <strong>satım</strong> (kırmızı)
-        yaptığı an — çok üçgen, çok işlem demek.
+        Her karakterin stateful portföy değeri saat saat izlenir. Kesikli çizgi:
+        <strong> V2 başlangıcında eşit dolar tutarıyla alınan BTC + ETH + HYPE buy-and-hold benchmarkı.</strong>
+        Üçgenler o tick&apos;te gerçekleşen alım veya satımı gösterir. Cevap/veri boşluklarında çizgi kesilir.
       </p>
       <EquityChart data={curves} />
 
       <h2>Gün gün sonuçlar</h2>
       <p className="section-note">
-        Her kart bir gün — <strong>yana kaydırarak</strong> eskiden yeniye gezin.
-        Rakamlar o günün sonundaki <strong>toplam kâr/zarar</strong> (herkes
-        10.000 dolarla başladı). Altta, hiç dokunmadan bekleyenin (HODL) durumu.
+        Her kart o günün son geçerli portföy değerini gösterir. Herkes V2&apos;ye 10.000 dolarla başladı.
       </p>
       <DailySlider data={daily} />
 
@@ -102,7 +113,7 @@ export default async function Home() {
               <th>Karakter</th>
               <th className="num">Şu anki parası</th>
               <th className="num">Kâr / Zarar</th>
-              <th className="num">Alıp bekleyene göre</th>
+              <th className="num">HODL&apos;a göre</th>
               <th className="num">Kaç işlem yaptı</th>
               <th className="num">Ödediği komisyon</th>
               <th className="num">Yapay zeka gideri</th>
@@ -113,7 +124,6 @@ export default async function Home() {
             {rows.map((r, i) => {
               const pnl = r.equity ? (r.equity / 10000 - 1) * 100 : null;
               const vs = r.equity && r.hodl ? (r.equity / r.hodl - 1) * 100 : null;
-              // Net = alım satımdan kazanılan - yapay zekanın kendi gideri.
               const net = r.equity != null ? r.equity - 10000 - (r.ai_cost || 0) : null;
               return (
                 <tr key={r._id}>
@@ -125,8 +135,8 @@ export default async function Home() {
                     {r.gaps > 0 && (
                       <>
                         {" "}
-                        <span className="badge gap" title="Yapay zekanın cevap veremediği saat sayısı">
-                          {r.gaps} saat cevap yok
+                        <span className="badge gap" title="Modelin veya piyasa verisinin cevap veremediği tick sayısı">
+                          {r.gaps} gap
                         </span>
                       </>
                     )}
@@ -137,7 +147,7 @@ export default async function Home() {
                   <td className={`num ${cls(vs)}`}>{pct(vs)}</td>
                   <td className="num">{r.trades ?? 0}</td>
                   <td className="num">{money(r.fees_paid)}</td>
-                  <td className="num down">{signed(-(r.ai_cost || 0))}</td>
+                  <td className="num">{signed(-(r.ai_cost || 0))}</td>
                   <td className={`num ${cls(net)}`}>
                     <strong>{signed(net)}</strong>
                   </td>
@@ -149,63 +159,37 @@ export default async function Home() {
       </div>
 
       <div className="card explain">
-        <h3>Tablodaki sözler ne demek?</h3>
+        <h3>Benchmark ve maliyetler</h3>
         <dl>
-          <dt>Şu anki parası</dt>
+          <dt>HODL&apos;a göre</dt>
           <dd>
-            Elindeki nakit + sahip olduğu coinlerin bugünkü değeri. Herkes 10.000
-            dolarla başladı.
-          </dd>
-
-          <dt>Alıp bekleyene göre</dt>
-          <dd>
-            En başta parayı üçe bölüp BTC, ETH ve HYPE alsaydık ve bir daha hiç
-            dokunmasaydık, bugün <strong>{money(hodl)}</strong> olurdu. Bu sütun,
-            karakterin ondan ne kadar iyi ya da kötü olduğunu gösteriyor.{" "}
-            <strong>Artı ise</strong> alım satım yapmak işe yaramış,{" "}
-            <strong>eksi ise</strong> hiç uğraşmadan beklemek daha iyiymiş demek.
+            V2&apos;nin ilk tick&apos;inde 10.000 dolar üçe bölünüp BTC, ETH ve HYPE alınmış
+            ve sonrasında hiç işlem yapılmamış kabul edilir. Girişte aynı fee ve slippage uygulanır.
+            Bugünkü benchmark değeri <strong>{money(hodl)}</strong>.
           </dd>
 
           <dt>Ödediği komisyon</dt>
           <dd>
-            Borsaya ödenen işlem ücreti. Her alım satımda tutarın %0,07&apos;si
-            kesiliyor, üstüne %0,05 fiyat kayması ekleniyor. Çok işlem yapan çok
-            öder — bu yüzden gereksiz alım satım kazancı yer.{" "}
-            <em>Yapay zekanın kendi maliyeti bu tabloya dahil değil.</em>
+            Paper broker her gerçekleşen alım/satımda %0,07 taker fee ve %0,05 slippage uygular.
           </dd>
-
-          <dt>Kaç işlem yaptı</dt>
-          <dd>Şimdiye kadar kaç kez alım veya satım yaptığı.</dd>
 
           <dt>Yapay zeka gideri</dt>
           <dd>
-            Her saat başı her karakter yapay zekaya soru soruyor ve bu bedava
-            değil. Bu sütun, o karakterin bugüne kadar harcadığı yapay zeka
-            parasını gösteriyor. Kaç kelime (token) harcadığı aşağıdaki
-            kartlarda yazıyor.
-            <br />
-            <em>
-              Not: bu rakam, kullanılan yapay zeka aylık abonelikle çalıştığı
-              için cebimizden tek tek çıkmıyor. &quot;Bu kadar token, liste
-              fiyatından şu kadar tutardı&quot; hesabı. Yine de gerçek maliyeti
-              görmek için doğru ölçü bu.
-            </em>
+            Model sağlayıcısının bu deney için raporladığı kullanım maliyetidir.
+            NVIDIA NIM ücretsiz kullanımında bu değer şu anda 0 dolar olabilir; token sayıları ayrıca tutulur.
           </dd>
 
           <dt>Net sonuç</dt>
           <dd>
-            <strong>En önemli sayı bu.</strong> Alım satımdan kazandığı para{" "}
-            <em>eksi</em> yapay zeka gideri. Çünkü bir bot 50 dolar kazanıp 200
-            dolar yapay zeka gideri yapıyorsa aslında para kaybediyordur. Burada
-            kâr diyebilmek için, yapay zekanın kendi masrafını da çıkarması gerekiyor.
+            Portföy değeri − 10.000 dolar başlangıç sermayesi − raporlanan AI maliyeti.
           </dd>
         </dl>
       </div>
 
       <h2>Karakterler ve portföyleri</h2>
       <p className="section-note">
-        Aşağıda her karaktere verilen talimatın <strong>tamamı</strong> yazıyor.
-        Gizli bir şey yok — üçü de bu metni okuyup karar veriyor.
+        Üç karakter aynı model, aynı temperature ve aynı market snapshot&apos;ını alır.
+        Aşağıda yalnız persona talimatları farklıdır.
       </p>
 
       {people.map((p) => {
@@ -225,26 +209,26 @@ export default async function Home() {
                 <p className="chart-title">Parasını nereye koydu?</p>
                 <Donut slices={slicesOf(row)} total={row.equity} />
 
-                <p className="chart-title">Yapay zeka masrafı</p>
+                <p className="chart-title">Model kullanımı</p>
                 <ul className="cost-list">
                   <li>
-                    <span>Harcanan kelime (token)</span>
+                    <span>Harcanan token</span>
                     <span className="num">
                       {tokens(
-                        (row.tok_in || 0) + (row.tok_out || 0) +
-                        (row.tok_cache_w || 0) + (row.tok_cache_r || 0),
+                        (row.tok_in || 0) +
+                        (row.tok_out || 0) +
+                        (row.tok_cache_w || 0) +
+                        (row.tok_cache_r || 0),
                       )}
                     </span>
                   </li>
                   <li>
-                    <span>Bunun parası</span>
-                    <span className="num down">{signed(-(row.ai_cost || 0))}</span>
+                    <span>Raporlanan model maliyeti</span>
+                    <span className="num">{money(row.ai_cost || 0)}</span>
                   </li>
                   <li>
-                    <span>Saat başına ortalama</span>
-                    <span className="num">
-                      {money((row.ai_cost || 0) / ((row.tick ?? 0) + 1))}
-                    </span>
+                    <span>Temperature</span>
+                    <span className="num">{row.temperature ?? "—"}</span>
                   </li>
                 </ul>
               </>
@@ -252,7 +236,7 @@ export default async function Home() {
 
             {p.persona && (
               <>
-                <p className="chart-title">Ona verilen talimat</p>
+                <p className="chart-title">Ona verilen persona talimatı</p>
                 <pre className="persona-prompt">{p.persona}</pre>
               </>
             )}
