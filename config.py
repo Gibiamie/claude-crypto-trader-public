@@ -1,14 +1,21 @@
 """Deney konfigürasyonu — tüm parametreler tek dosyada."""
 
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-STATE_DIR = ROOT / "state"
 JOURNAL_DIR = ROOT / "journal"
 
-# Hyperliquid spot pair `name` değerleri. Spot'ta pair adı @index formatında —
-# sadece PURR/USDC okunabilir isim taşır. spotMeta'dan doğrulanabilir:
-#   curl -s -X POST https://api.hyperliquid.xyz/info -d '{"type":"spotMeta"}'
+# V1/Phase 0 satırları journal dosyalarında korunur ancak aktif deneyden ayrılır.
+# Yeni bir metodoloji/model değişikliğinde yeni bir EXPERIMENT_ID kullan.
+EXPERIMENT_ID = os.environ.get("EXPERIMENT_ID", "v2-2026-09-20")
+SCHEMA_VERSION = 2
+STRATEGY_VERSION = "v2.0.0"
+
+# GitHub Actions runner geçicidir; bu klasör workflow sonunda repoya commit edilir.
+STATE_DIR = ROOT / "state" / EXPERIMENT_ID
+
+# Hyperliquid spot pair `name` değerleri.
 ASSETS = {
     "BTC": "@142",   # UBTC/USDC
     "ETH": "@151",   # UETH/USDC
@@ -18,26 +25,22 @@ ASSETS = {
 START_CASH = 10_000.0
 
 INTERVAL = "1h"
-CANDLE_LOOKBACK = 72      # modele gösterilecek KAPALI mum sayısı (3 gün)
+CANDLE_LOOKBACK = 72
 
-TAKER_FEE = 0.0007        # %0.07 — Hyperliquid spot taker
-SLIPPAGE = 0.0005         # %0.05 — ince order book payı
-MIN_TRADE_USD = 25.0      # altındaki emirler ücret gürültüsü, reddedilir
+TAKER_FEE = 0.0007
+SLIPPAGE = 0.0005
+MIN_TRADE_USD = 25.0
 
-# NVIDIA NIM (build.nvidia.com) — OpenAI-uyumlu, ücretsiz katman.
-# Kart istemiyor, dakikada ~40 istek sınırı var (biz saatte 3 istek yapıyoruz).
-# Model değiştirmek istersen: https://build.nvidia.com katalogundan başka bir
-# `org/model-adı` seç ve burada değiştir — tek yer, her şeyi etkiler.
+# NVIDIA NIM — OpenAI uyumlu.
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 MODEL_TIMEOUT = 180
+MODEL_TEMPERATURE = 0.0
+MODEL_MAX_TOKENS = 1024
+MODEL_REPAIR_ATTEMPTS = 1
 
-# Üç agent da AYNI model + AYNI veriyi alır. Tek değişken risk profili.
-# Leaderboard bu yüzden model kıyası değil strateji kıyasıdır: "risk iştahı sonucu
-# ne kadar değiştiriyor?"
-#
-# `id`   → kalıcı anahtar (journal dosyası). DEĞİŞTİRME, veriyi bozar.
-# `name` → sitede gösterilen isim. Serbestçe değiştirilebilir.
+# Üç agent aynı model + aynı veri + aynı inference ayarlarını alır.
+# Kontrollü değişken yalnız risk personasıdır.
 AGENTS = [
     {
         "id": "temkinli", "name": "Stop", "label": "Stop",
