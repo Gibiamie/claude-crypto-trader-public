@@ -5,6 +5,7 @@ __pycache__/
 # Runtime state is ignored for ordinary local work.
 # GitHub Actions force-adds the active experiment state so hosted runners stay stateful.
 state/
+stock_state/
 tick.log
 
 # Next

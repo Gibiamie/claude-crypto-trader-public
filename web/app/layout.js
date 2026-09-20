@@ -1,9 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Claude Crypto Trader",
+  title: "AI Market Trader Lab",
   description:
-    "Claude Opus 5 saatlik olarak spot kripto kararı veriyor. Kararlar, gerekçeler ve kâr/zarar canlı yayında.",
+    "Crypto, US stocks ve BIST için bağımsız paper-trading deneyleri; AI kararları, portföyler ve benchmark karşılaştırmaları.",
 };
 
 export default function RootLayout({ children }) {
@@ -12,16 +12,20 @@ export default function RootLayout({ children }) {
       <body>
         <header className="site-header">
           <a href="/" className="brand">
-            claude<span>·</span>crypto<span>·</span>trader
+            ai<span>·</span>market<span>·</span>lab
           </a>
+          <nav className="market-nav" aria-label="Piyasalar">
+            <a href="/">Crypto</a>
+            <a href="/stocks/us">US Stocks</a>
+            <a href="/stocks/bist">BIST</a>
+          </nav>
           <p className="tagline">
-            Üç yapay zeka karakteri, her saat başı kripto alıp satıyor. Sanal parayla.
+            Aynı risk karakterleri, farklı piyasalarda bağımsız paper portföyler yönetiyor.
           </p>
           <p className="disclaimer">
-            <strong>Yatırım tavsiyesi değildir.</strong> Bu bir deney. Gerçek para
-            yok, hepsi sanal. Fiyatlar Hyperliquid borsasından canlı alınıyor. Her
-            işlemden %0,07 komisyon ve %0,05 fiyat kayması düşülüyor, yani sonuçlar
-            gerçeğe yakın çıkıyor.
+            <strong>Yatırım tavsiyesi değildir.</strong> Sistem paper simulation&apos;dır ve
+            Midas hesabına otomatik emir göndermez. Her piyasanın veri kaynağı ve benchmarkı
+            kendi sayfasında açıkça belirtilir.
           </p>
         </header>
         <main>{children}</main>

@@ -40,7 +40,7 @@ function splitOnGaps(points) {
   return out;
 }
 
-export default function EquityChart({ data }) {
+export default function EquityChart({ data, benchmarkLabel = "BTC/ETH/HYPE eşit ağırlıklı HODL" }) {
   const series = data?.series || [];
   const hodl = data?.hodl || [];
   const allPts = series.flatMap((s) => s.points);
@@ -130,7 +130,7 @@ export default function EquityChart({ data }) {
             {s.name}
           </li>
         ))}
-        <li><span className="dot dash" /> BTC/ETH/HYPE eşit ağırlıklı HODL</li>
+        <li><span className="dot dash" /> {benchmarkLabel}</li>
         <li><span className="tri up">▲</span> alım</li>
         <li><span className="tri down">▼</span> satım</li>
       </ul>
