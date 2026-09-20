@@ -1,13 +1,7 @@
-"""Tek tick: tüm agent'lar için piyasa çek → karar al → uygula → journal'a yaz.
-
-Cron'dan saatlik çalışır. Üst üste binmeyi flock engeller (bkz. README).
-
-Kritik: bir agent hata alırsa (Claude limiti, network, bozuk JSON) portföyü
-DEĞİŞMEZ ve journal'a açık bir gap satırı yazılır. Sessiz atlama yok — grafikte
-delik olduğu görülebilsin diye.
-"""
+"""Tek V2 tick: market → karar → stateful paper execution → journal."""
 
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -15,50 +9,78 @@ from datetime import datetime, timezone
 import hl
 from agents import call
 from broker import Portfolio, hodl_init, hodl_value
-from config import AGENTS, ASSETS, CANDLE_LOOKBACK, INTERVAL, JOURNAL_DIR
+from config import (
+    AGENTS,
+    ASSETS,
+    CANDLE_LOOKBACK,
+    EXPERIMENT_ID,
+    INTERVAL,
+    JOURNAL_DIR,
+    MODEL_TEMPERATURE,
+    SCHEMA_VERSION,
+    STRATEGY_VERSION,
+)
 from prompt import build
-
-VALID_ACTIONS = {"BUY", "SELL", "HOLD"}
 
 
 def journal_path(agent_id: str):
     return JOURNAL_DIR / f"{agent_id}.jsonl"
 
 
-def read_history(agent_id: str, n: int = 40) -> list[dict]:
+def _read_rows(agent_id: str) -> list[dict]:
     p = journal_path(agent_id)
     if not p.exists():
         return []
-    lines = p.read_text().strip().splitlines()[-n:]
     out = []
-    for line in lines:
+    for line in p.read_text().splitlines():
+        if not line.strip():
+            continue
         try:
-            row = json.loads(line)
+            out.append(json.loads(line))
         except json.JSONDecodeError:
             continue
-        for d in row.get("decisions", []):
-            if d.get("action") in ("BUY", "SELL"):
-                out.append({"tick": row["tick"], **d})
     return out
 
 
+def experiment_rows(agent_id: str) -> list[dict]:
+    return [r for r in _read_rows(agent_id) if r.get("experiment_id") == EXPERIMENT_ID]
+
+
+def read_history(agent_id: str, n: int = 40) -> list[dict]:
+    rows = experiment_rows(agent_id)[-n:]
+    out = []
+    for row in rows:
+        for d in row.get("decisions", []):
+            if d.get("action") in ("BUY", "SELL"):
+                out.append({"tick": row.get("tick"), **d})
+    return out[-8:]
+
+
 def tick_number(agent_id: str) -> int:
-    p = journal_path(agent_id)
-    return sum(1 for _ in p.open()) if p.exists() else 0
+    return len(experiment_rows(agent_id))
 
 
 def write_journal(agent_id: str, row: dict) -> None:
-    """Journal'a append — tek kaynak-of-truth. Site bu dosyaları okur."""
     JOURNAL_DIR.mkdir(parents=True, exist_ok=True)
-    with journal_path(agent_id).open("a") as f:
+    with journal_path(agent_id).open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def load_portfolio(agent_id: str) -> Portfolio:
+    """State dosyası kaybolursa son V2 journal snapshot'ından kurtar."""
+    p = Portfolio.path(agent_id)
+    if p.exists():
+        return Portfolio.load(agent_id)
+    for row in reversed(experiment_rows(agent_id)):
+        snap = row.get("portfolio_state")
+        if isinstance(snap, dict):
+            return Portfolio(**snap)
+    return Portfolio()
+
+
 def fetch_market() -> tuple[dict, dict]:
-    """(model için özet, etiket→canlı mid fiyat)"""
     now_ms = int(time.time() * 1000)
     all_mids = hl.mids()
-
     market, prices = {}, {}
     for label, pair in ASSETS.items():
         if pair not in all_mids:
@@ -71,63 +93,87 @@ def fetch_market() -> tuple[dict, dict]:
 
 
 def apply_decisions(pf: Portfolio, decisions: list, prices: dict) -> list[dict]:
+    """SELL'leri önce uygula; BUY'ları mevcut nakde oransal ölçekle."""
     fills = []
+
     for d in decisions:
-        if not isinstance(d, dict):
+        if d["action"] != "SELL":
             continue
-        coin = str(d.get("coin", "")).upper()
-        action = str(d.get("action", "")).upper()
+        coin = d["coin"]
+        requested = float(d["usd"])
+        f = pf.sell(coin, requested, prices[coin])
+        f["requested_usd"] = round(requested, 2)
+        fills.append(f)
 
-        if coin not in prices:
-            fills.append({"ok": False, "coin": coin, "why": "bilinmeyen varlık"})
-            continue
-        if action not in VALID_ACTIONS:
-            fills.append({"ok": False, "coin": coin, "why": f"geçersiz action: {action}"})
-            continue
-        if action == "HOLD":
-            continue
+    buys = [d for d in decisions if d["action"] == "BUY"]
+    requested_total = sum(float(d["usd"]) for d in buys)
+    available = max(pf.cash, 0.0)
+    scale = min(1.0, available / requested_total) if requested_total > 0 else 1.0
 
-        try:
-            usd = float(d.get("usd") or 0)
-        except (TypeError, ValueError):
-            fills.append({"ok": False, "coin": coin, "why": "usd sayı değil"})
-            continue
-        if usd <= 0:
-            fills.append({"ok": False, "coin": coin, "why": "usd <= 0"})
-            continue
+    for d in buys:
+        coin = d["coin"]
+        requested = float(d["usd"])
+        executed = requested * scale
+        f = pf.buy(coin, executed, prices[coin])
+        f["requested_usd"] = round(requested, 2)
+        f["allocation_scale"] = round(scale, 8)
+        fills.append(f)
 
-        px = prices[coin]
-        fills.append(pf.buy(coin, usd, px) if action == "BUY" else pf.sell(coin, usd, px))
     return fills
+
+
+def meta(ts: str, agent: dict, tick: int) -> dict:
+    return {
+        "ts": ts,
+        "tick": tick,
+        "experiment_id": EXPERIMENT_ID,
+        "schema_version": SCHEMA_VERSION,
+        "strategy_version": STRATEGY_VERSION,
+        "git_sha": os.environ.get("GITHUB_SHA"),
+        "agent": agent["id"],
+        "label": agent["label"],
+        "name": agent.get("name"),
+        "tagline": agent.get("tagline"),
+        "persona": agent.get("persona"),
+        "model": agent.get("model"),
+        "effort": agent.get("effort"),
+        "temperature": MODEL_TEMPERATURE,
+    }
 
 
 def run_agent(agent: dict, market: dict, prices: dict, hodl: float, ts: str) -> dict:
     agent_id = agent["id"]
-    pf = Portfolio.load(agent_id)
+    pf = load_portfolio(agent_id)
+    pf.save(agent_id)
     n = tick_number(agent_id)
 
-    prompt = build(pf, market, prices, read_history(agent_id), n,
-                   persona=agent.get("persona", ""))
+    prompt = build(pf, market, prices, read_history(agent_id), n, persona=agent.get("persona", ""))
     res = call(agent, prompt)
 
     row = {
-        "ts": ts, "tick": n, "agent": agent_id, "label": agent["label"],
-        # Kimlik alanları journal'a yazılır ki site config'e bağımlı olmasın —
-        # bir tick'in hangi persona ile alındığı kaydın kendisinde dursun.
-        "name": agent.get("name"), "tagline": agent.get("tagline"),
-        "persona": agent.get("persona"),
-        "model": agent.get("model"), "effort": agent.get("effort"),
-        "ok": res["ok"], "error": res["error"],
-        "prices": prices, "hodl": round(hodl, 2),
-        "decisions": res["decisions"], "thesis": res["thesis"],
+        **meta(ts, agent, n),
+        "ok": res["ok"],
+        "error": res["error"],
+        "prices": prices,
+        "market_snapshot": market,
+        "hodl": round(hodl, 2),
+        "benchmark": "BTC/ETH/HYPE equal-weight buy-and-hold",
+        "decisions": res["decisions"],
+        "thesis": res["thesis"],
         "usage": res["usage"],
+        "repaired": res.get("repaired", False),
     }
 
     if not res["ok"]:
-        # Gap: portföye dokunma, ama deliği açıkça kaydet.
         row.update({
-            "fills": [], "equity": round(pf.value(prices), 2),
-            "cash": round(pf.cash, 2), "positions": pf.positions, "gap": True,
+            "fills": [],
+            "equity": round(pf.value(prices), 2),
+            "cash": round(pf.cash, 2),
+            "positions": {k: round(v, 8) for k, v in pf.positions.items()},
+            "fees_paid": round(pf.fees_paid, 2),
+            "trades": pf.trades,
+            "portfolio_state": pf.snapshot(),
+            "gap": True,
         })
         write_journal(agent_id, row)
         return row
@@ -136,12 +182,15 @@ def run_agent(agent: dict, market: dict, prices: dict, hodl: float, ts: str) -> 
     pf.save(agent_id)
 
     row.update({
-        "fills": fills, "gap": False,
+        "fills": fills,
+        "gap": False,
         "equity": round(pf.value(prices), 2),
         "cash": round(pf.cash, 2),
         "positions": {k: round(v, 8) for k, v in pf.positions.items()},
         "fees_paid": round(pf.fees_paid, 2),
         "trades": pf.trades,
+        "realized_pnl": round(pf.realized_pnl, 2),
+        "portfolio_state": pf.snapshot(),
         "raw": res["raw"][:4000],
     })
     write_journal(agent_id, row)
@@ -162,25 +211,27 @@ def main(argv: list[str]) -> int:
     try:
         market, prices = fetch_market()
     except hl.HLError as e:
-        # Piyasa verisi yoksa hiçbir agent karar veremez — hepsine gap yaz.
         print(f"[market] HATA — {e}")
         for a in agents:
-            write_journal(a["id"], {"ts": ts, "tick": tick_number(a["id"]),
-                                    "agent": a["id"], "ok": False, "gap": True,
-                                    "error": f"market: {e}"})
+            write_journal(a["id"], {
+                **meta(ts, a, tick_number(a["id"])),
+                "ok": False,
+                "gap": True,
+                "error": f"market: {e}",
+            })
         return 1
 
     hodl_init(prices)
     hodl = hodl_value(prices)
+    print(f"[experiment] {EXPERIMENT_ID}")
     print(f"[market] {ts} " + " ".join(f"{k}={v}" for k, v in prices.items()))
     print(f"[hodl]   {hodl:.2f}")
 
     if dry:
         for agent in agents:
-            pf = Portfolio.load(agent["id"])
+            pf = load_portfolio(agent["id"])
             n = tick_number(agent["id"])
-            p = build(pf, market, prices, read_history(agent["id"]), n,
-                      persona=agent.get("persona", ""))
+            p = build(pf, market, prices, read_history(agent["id"]), n, persona=agent.get("persona", ""))
             print(f"\n===== {agent['id']} · tick {n} · ~{len(p)//3.5:.0f} token =====")
             print(p)
         return 0
@@ -189,17 +240,31 @@ def main(argv: list[str]) -> int:
     for agent in agents:
         try:
             row = run_agent(agent, market, prices, hodl, ts)
-        except Exception as e:  # bir agent diğerlerini düşürmesin
+        except Exception as e:
             print(f"[{agent['id']}] BEKLENMEDİK — {e}")
-            write_journal(agent["id"], {"ts": ts, "agent": agent["id"], "ok": False,
-                                        "gap": True, "error": f"crash: {e}"})
+            pf = load_portfolio(agent["id"])
+            write_journal(agent["id"], {
+                **meta(ts, agent, tick_number(agent["id"])),
+                "ok": False,
+                "gap": True,
+                "error": f"crash: {e}",
+                "equity": round(pf.value(prices), 2),
+                "cash": round(pf.cash, 2),
+                "positions": {k: round(v, 8) for k, v in pf.positions.items()},
+                "fees_paid": round(pf.fees_paid, 2),
+                "trades": pf.trades,
+                "portfolio_state": pf.snapshot(),
+            })
             failures += 1
             continue
 
         if row["ok"]:
-            acted = [f"{f['side']} {f['coin']} ${f['usd']}" for f in row["fills"] if f.get("ok")]
+            acted = [
+                f"{f.get('side')} {f.get('coin')} ${f.get('usd')}"
+                for f in row["fills"] if f.get("ok")
+            ]
             print(f"[{agent['id']:16s}] eq={row['equity']:>9.2f} "
-                  f"{'· '.join(acted) if acted else 'HOLD'}")
+                  f"{' · '.join(acted) if acted else 'HOLD'}")
         else:
             failures += 1
             print(f"[{agent['id']:16s}] GAP — {row['error']}")
