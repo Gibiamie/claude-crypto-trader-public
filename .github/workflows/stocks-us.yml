@@ -31,12 +31,7 @@ jobs:
       - name: US paper tick
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python3 -u -m stocks.tick --market us --force
-          else
-            python3 -u -m stocks.tick --market us
-          fi
+        run: python3 -u -m stocks.tick --market us
 
       - name: US journal/state commit
         if: always()
