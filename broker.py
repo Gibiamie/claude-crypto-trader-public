@@ -47,7 +47,6 @@ class Portfolio:
 
         self.cash -= usd
         self.positions[label] = self.positions.get(label, 0.0) + qty
-        # Maliyet = kasadan çıkan toplam para. Fee ve slippage böylece maliyete dahil olur.
         self.cost_basis[label] = self.cost_basis.get(label, 0.0) + usd
         self.fees_paid += fee
         self.trades += 1
@@ -103,6 +102,10 @@ class Portfolio:
 HODL_PATH = STATE_DIR / "_hodl.json"
 
 
+def hodl_restore(snap: dict) -> None:
+    _atomic_write(HODL_PATH, json.dumps(snap, indent=2))
+
+
 def hodl_init(prices: dict[str, float]) -> dict:
     if HODL_PATH.exists():
         return json.loads(HODL_PATH.read_text())
@@ -114,7 +117,7 @@ def hodl_init(prices: dict[str, float]) -> dict:
             for label, px in prices.items()
         },
     }
-    _atomic_write(HODL_PATH, json.dumps(snap, indent=2))
+    hodl_restore(snap)
     return snap
 
 
