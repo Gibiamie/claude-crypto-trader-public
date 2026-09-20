@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import hl
 from agents import call
-from broker import Portfolio, hodl_init, hodl_value
+from broker import Portfolio, hodl_init, hodl_restore, hodl_value
 from config import (
     AGENTS,
     ASSETS,
@@ -67,15 +67,25 @@ def write_journal(agent_id: str, row: dict) -> None:
 
 
 def load_portfolio(agent_id: str) -> Portfolio:
-    """State dosyası kaybolursa son V2 journal snapshot'ından kurtar."""
-    p = Portfolio.path(agent_id)
-    if p.exists():
-        return Portfolio.load(agent_id)
+    """Journal source-of-truth; state dosyası yalnız kalıcı cache/backup."""
     for row in reversed(experiment_rows(agent_id)):
         snap = row.get("portfolio_state")
         if isinstance(snap, dict):
             return Portfolio(**snap)
+    if Portfolio.path(agent_id).exists():
+        return Portfolio.load(agent_id)
     return Portfolio()
+
+
+def recover_hodl_from_journal() -> bool:
+    """_hodl.json kaybolursa journal içindeki son benchmark snapshot'ını geri yükle."""
+    for agent in AGENTS:
+        for row in reversed(experiment_rows(agent["id"])):
+            snap = row.get("hodl_state")
+            if isinstance(snap, dict) and snap.get("qty") and snap.get("t0_prices"):
+                hodl_restore(snap)
+                return True
+    return False
 
 
 def fetch_market() -> tuple[dict, dict]:
@@ -141,13 +151,15 @@ def meta(ts: str, agent: dict, tick: int) -> dict:
     }
 
 
-def run_agent(agent: dict, market: dict, prices: dict, hodl: float, ts: str) -> dict:
+def run_agent(agent: dict, market: dict, prices: dict, hodl: float, hodl_state: dict, ts: str) -> dict:
     agent_id = agent["id"]
     pf = load_portfolio(agent_id)
+    # İlk V2 tick'i model hatası verse bile başlangıç state'i kalıcı olsun.
     pf.save(agent_id)
     n = tick_number(agent_id)
 
-    prompt = build(pf, market, prices, read_history(agent_id), n, persona=agent.get("persona", ""))
+    prompt_tick = 0 if pf.trades == 0 and not pf.positions else n
+    prompt = build(pf, market, prices, read_history(agent_id), prompt_tick, persona=agent.get("persona", ""))
     res = call(agent, prompt)
 
     row = {
@@ -157,6 +169,7 @@ def run_agent(agent: dict, market: dict, prices: dict, hodl: float, ts: str) -> 
         "prices": prices,
         "market_snapshot": market,
         "hodl": round(hodl, 2),
+        "hodl_state": hodl_state,
         "benchmark": "BTC/ETH/HYPE equal-weight buy-and-hold",
         "decisions": res["decisions"],
         "thesis": res["thesis"],
@@ -179,7 +192,6 @@ def run_agent(agent: dict, market: dict, prices: dict, hodl: float, ts: str) -> 
         return row
 
     fills = apply_decisions(pf, res["decisions"], prices)
-    pf.save(agent_id)
 
     row.update({
         "fills": fills,
@@ -193,7 +205,10 @@ def run_agent(agent: dict, market: dict, prices: dict, hodl: float, ts: str) -> 
         "portfolio_state": pf.snapshot(),
         "raw": res["raw"][:4000],
     })
+    # Journal transaction kaydıdır. State journal'dan sonra yazılır; yarıda kesilirse
+    # sonraki run load_portfolio() ile journal snapshot'ından toparlar.
     write_journal(agent_id, row)
+    pf.save(agent_id)
     return row
 
 
@@ -221,7 +236,8 @@ def main(argv: list[str]) -> int:
             })
         return 1
 
-    hodl_init(prices)
+    recover_hodl_from_journal()
+    hodl_state = hodl_init(prices)
     hodl = hodl_value(prices)
     print(f"[experiment] {EXPERIMENT_ID}")
     print(f"[market] {ts} " + " ".join(f"{k}={v}" for k, v in prices.items()))
@@ -231,7 +247,8 @@ def main(argv: list[str]) -> int:
         for agent in agents:
             pf = load_portfolio(agent["id"])
             n = tick_number(agent["id"])
-            p = build(pf, market, prices, read_history(agent["id"]), n, persona=agent.get("persona", ""))
+            prompt_tick = 0 if pf.trades == 0 and not pf.positions else n
+            p = build(pf, market, prices, read_history(agent["id"]), prompt_tick, persona=agent.get("persona", ""))
             print(f"\n===== {agent['id']} · tick {n} · ~{len(p)//3.5:.0f} token =====")
             print(p)
         return 0
@@ -239,7 +256,7 @@ def main(argv: list[str]) -> int:
     failures = 0
     for agent in agents:
         try:
-            row = run_agent(agent, market, prices, hodl, ts)
+            row = run_agent(agent, market, prices, hodl, hodl_state, ts)
         except Exception as e:
             print(f"[{agent['id']}] BEKLENMEDİK — {e}")
             pf = load_portfolio(agent["id"])
