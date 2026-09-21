@@ -1,0 +1,12 @@
+{
+  "cash": 9000.028573546,
+  "positions": {
+    "AMD": 1.6414
+  },
+  "cost_basis": {
+    "AMD": 999.9714264539998
+  },
+  "realized_pnl": 0.0,
+  "friction_paid": 0.998972454,
+  "trades": 1
+}
