@@ -1,0 +1,12 @@
+{
+  "cash": 85248.51325,
+  "positions": {
+    "THYAO.IS": 49.0
+  },
+  "cost_basis": {
+    "THYAO.IS": 14751.48675
+  },
+  "realized_pnl": 0.0,
+  "friction_paid": 14.73675,
+  "trades": 1
+}
