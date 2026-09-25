@@ -1,14 +1,16 @@
 {
-  "cash": 55903.29735000001,
+  "cash": 41175.08385000001,
   "positions": {
     "THYAO.IS": 49.0,
-    "PETKM.IS": 1300.0
+    "PETKM.IS": 1300.0,
+    "TOASO.IS": 51.0
   },
   "cost_basis": {
     "THYAO.IS": 14751.48675,
-    "PETKM.IS": 29345.215899999996
+    "PETKM.IS": 29345.215899999996,
+    "TOASO.IS": 14728.213499999996
   },
   "realized_pnl": 0.0,
-  "friction_paid": 44.05265,
-  "trades": 3
+  "friction_paid": 58.766149999999996,
+  "trades": 4
 }
