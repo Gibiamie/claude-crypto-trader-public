@@ -1,8 +1,12 @@
 {
-  "cash": 9981.942114542588,
-  "positions": {},
-  "cost_basis": {},
+  "cash": 9881.942114542588,
+  "positions": {
+    "BTC": 0.0011847254953059967
+  },
+  "cost_basis": {
+    "BTC": 100.0
+  },
   "realized_pnl": -18.05788545741089,
-  "fees_paid": 1.6679390375060668,
-  "trades": 8
+  "fees_paid": 1.7379390375060668,
+  "trades": 9
 }
