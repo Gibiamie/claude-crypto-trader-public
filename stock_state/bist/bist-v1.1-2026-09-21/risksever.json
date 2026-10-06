@@ -1,22 +1,24 @@
 {
-  "cash": 18409.881390000013,
+  "cash": 4851.336390000016,
   "positions": {
     "THYAO.IS": 49.0,
     "PETKM.IS": 1300.0,
-    "TOASO.IS": 51.0,
+    "TOASO.IS": 81.0,
     "BIMAS.IS": 35.0,
     "HEKTS.IS": 2301.0,
-    "SASA.IS": 1569.0
+    "SASA.IS": 1569.0,
+    "YKBNK.IS": 150.0
   },
   "cost_basis": {
     "THYAO.IS": 14751.48675,
     "PETKM.IS": 29345.215899999996,
-    "TOASO.IS": 14728.213499999996,
+    "TOASO.IS": 22836.313499999997,
     "BIMAS.IS": 14767.252499999999,
     "HEKTS.IS": 4998.163169999999,
-    "SASA.IS": 2999.7867899999997
+    "SASA.IS": 2999.7867899999997,
+    "YKBNK.IS": 5450.444999999999
   },
   "realized_pnl": 0.0,
-  "friction_paid": 81.50861,
-  "trades": 7
+  "friction_paid": 95.05360999999999,
+  "trades": 9
 }
