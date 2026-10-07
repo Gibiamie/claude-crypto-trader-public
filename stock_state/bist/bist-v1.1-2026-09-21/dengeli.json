@@ -1,12 +1,14 @@
 {
-  "cash": 78004.4264,
+  "cash": 63012.60956,
   "positions": {
-    "KRDMD.IS": 484.0
+    "KRDMD.IS": 484.0,
+    "YKBNK.IS": 411.0
   },
   "cost_basis": {
-    "KRDMD.IS": 21995.573599999996
+    "KRDMD.IS": 21995.573599999996,
+    "YKBNK.IS": 14991.81684
   },
   "realized_pnl": 0.0,
-  "friction_paid": 21.973599999999998,
-  "trades": 1
+  "friction_paid": 36.95044,
+  "trades": 2
 }
