@@ -1,12 +1,14 @@
 {
-  "cash": 14048.670060000017,
+  "cash": 4854.985560000018,
   "positions": {
     "PETKM.IS": 1300.0,
     "TOASO.IS": 81.0,
     "BIMAS.IS": 35.0,
     "HEKTS.IS": 2301.0,
     "SASA.IS": 1569.0,
-    "YKBNK.IS": 282.0
+    "YKBNK.IS": 282.0,
+    "TUPRS.IS": 14.0,
+    "ALARK.IS": 34.0
   },
   "cost_basis": {
     "PETKM.IS": 29345.215899999996,
@@ -14,9 +16,11 @@
     "BIMAS.IS": 14767.252499999999,
     "HEKTS.IS": 4998.163169999999,
     "SASA.IS": 2999.7867899999997,
-    "YKBNK.IS": 10265.335079999997
+    "YKBNK.IS": 10265.335079999997,
+    "TUPRS.IS": 5518.012499999999,
+    "ALARK.IS": 3675.6719999999996
   },
   "realized_pnl": -739.262999999999,
-  "friction_paid": 113.88994,
-  "trades": 11
+  "friction_paid": 123.07444,
+  "trades": 13
 }
