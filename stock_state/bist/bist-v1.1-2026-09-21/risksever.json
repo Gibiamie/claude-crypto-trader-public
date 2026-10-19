@@ -1,5 +1,5 @@
 {
-  "cash": 4489.845810000019,
+  "cash": 4404.210260000019,
   "positions": {
     "PETKM.IS": 1300.0,
     "TOASO.IS": 73.0,
@@ -10,7 +10,7 @@
     "TUPRS.IS": 14.0,
     "ALARK.IS": 34.0,
     "ISCTR.IS": 11.0,
-    "SAHOL.IS": 25.0
+    "SAHOL.IS": 26.0
   },
   "cost_basis": {
     "PETKM.IS": 29345.215899999996,
@@ -22,9 +22,9 @@
     "TUPRS.IS": 5518.012499999999,
     "ALARK.IS": 3675.6719999999996,
     "ISCTR.IS": 144.24409999999997,
-    "SAHOL.IS": 2133.38125
+    "SAHOL.IS": 2219.0168
   },
   "realized_pnl": -1082.2157703703692,
-  "friction_paid": 127.26418999999999,
-  "trades": 16
+  "friction_paid": 127.34973999999998,
+  "trades": 17
 }
