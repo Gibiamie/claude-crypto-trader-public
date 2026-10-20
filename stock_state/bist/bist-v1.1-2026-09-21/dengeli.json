@@ -1,14 +1,16 @@
 {
-  "cash": 68921.89778,
+  "cash": 53972.46328,
   "positions": {
     "YKBNK.IS": 411.0,
-    "ISCTR.IS": 1143.0
+    "ISCTR.IS": 1143.0,
+    "SAHOL.IS": 170.0
   },
   "cost_basis": {
     "YKBNK.IS": 14991.81684,
-    "ISCTR.IS": 14988.273299999997
+    "ISCTR.IS": 14988.273299999997,
+    "SAHOL.IS": 14949.434499999998
   },
   "realized_pnl": -1098.0120799999968,
-  "friction_paid": 72.84222,
-  "trades": 4
+  "friction_paid": 87.77672,
+  "trades": 5
 }
