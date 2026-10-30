@@ -1,16 +1,14 @@
 {
-  "cash": 53241.94925,
+  "cash": 66887.1404,
   "positions": {
-    "ISCTR.IS": 1143.0,
     "SAHOL.IS": 170.0,
     "TUPRS.IS": 41.0
   },
   "cost_basis": {
-    "ISCTR.IS": 14988.273299999997,
     "SAHOL.IS": 14949.434499999998,
     "TUPRS.IS": 14887.622749999999
   },
-  "realized_pnl": -1932.720199999998,
-  "friction_paid": 116.82074999999999,
-  "trades": 7
+  "realized_pnl": -3275.8023499999963,
+  "friction_paid": 130.47959999999998,
+  "trades": 8
 }

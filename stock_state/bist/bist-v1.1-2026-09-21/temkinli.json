@@ -1,12 +1,8 @@
 {
-  "cash": 90002.012,
-  "positions": {
-    "KRDMD.IS": 220.0
-  },
-  "cost_basis": {
-    "KRDMD.IS": 9997.987999999998
-  },
-  "realized_pnl": 0.0,
-  "friction_paid": 9.988,
-  "trades": 1
+  "cash": 98089.916,
+  "positions": {},
+  "cost_basis": {},
+  "realized_pnl": -1910.083999999998,
+  "friction_paid": 18.084,
+  "trades": 2
 }
